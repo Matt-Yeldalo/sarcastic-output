@@ -1,28 +1,57 @@
-build site:
-  image: node:6
+stages:
+  - build
+  - deploy
+
+build prod:
+  image: node:10.15.0-stretch
   stage: build
+  only:
+    - tags
   script:
-    - npm install --progress=false
+    # Install vuecli
+    - npm install -g @vue/cli@latest
+    # Install dependencies
+    - npm install
+    # Build App
     - npm run build
   artifacts:
-    expire_in: 1 week
     paths:
-      - dist
+      # Build folder
+      - dist/
+    expire_in: 1 hour
 
-unit test:
-  image: node:6
-  stage: test
-  script:
-    - npm install --progress=false
-    - npm run unit
-
-deploy:
-  image: alpine
+deploy prod:
+  image: python:latest
   stage: deploy
+  only:
+    - tags
   script:
-    - apk add --no-cache rsync openssh
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" >> ~/.ssh/id_dsa
-    - chmod 600 ~/.ssh/id_dsa
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    - rsync -rav --delete dist/ user@server.com:/your/project/path/
+    - pip install awscli
+    - aws s3 sync ./dist s3://YOUR_BUCKET_NAME
+
+build stage:
+  image: node:10.15.0-stretch
+  stage: build
+  only:
+    - master
+  script:
+    # Install vuecli
+    - npm install -g @vue/cli@latest
+    # Install dependencies
+    - npm install
+    # Build App
+    - npm run build-dev
+  artifacts:
+    paths:
+      # Build folder
+      - dist/
+    expire_in: 1 hour
+
+deploy stage:
+  image: python:latest
+  stage: deploy
+  only:
+    - master
+  script:
+    - pip install awscli
+    - aws s3 sync ./dist s3://YOUR_DEV_BUCKET_NAME
